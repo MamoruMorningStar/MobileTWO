@@ -21,7 +21,8 @@ fun HistoryScreen(
     viewModel: SplitViewModel,
     onCalculationClick: (String) -> Unit
 ) {
-    val calculations by viewModel.calculations.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val calculations = uiState.calculations
     val formatter = NumberFormat.getCurrencyInstance(Locale.getDefault())
     
     Column(

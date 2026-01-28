@@ -10,6 +10,7 @@ import com.example.mobiletwo.ui.screens.HistoryScreen
 import com.example.mobiletwo.ui.screens.HomeScreen
 import com.example.mobiletwo.ui.screens.InputScreen
 import com.example.mobiletwo.ui.screens.ResultScreen
+import com.example.mobiletwo.viewmodel.SplitEvent
 import com.example.mobiletwo.viewmodel.SplitViewModel
 
 @Composable
@@ -58,7 +59,7 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onNewCalculation = {
-                    viewModel.reset()
+                    viewModel.onEvent(SplitEvent.Reset)
                     navController.navigate(Screen.Input.route) {
                         popUpTo(Screen.Home.route) { inclusive = false }
                     }

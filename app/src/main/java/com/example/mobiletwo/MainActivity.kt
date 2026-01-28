@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
+import com.example.mobiletwo.data.CalculationRepository
 import com.example.mobiletwo.navigation.NavGraph
 import com.example.mobiletwo.ui.theme.MobileTwoTheme
 import com.example.mobiletwo.viewmodel.SplitViewModel
@@ -17,6 +18,7 @@ import com.example.mobiletwo.viewmodel.SplitViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val repository = CalculationRepository(applicationContext)
         enableEdgeToEdge()
         setContent {
             MobileTwoTheme {
@@ -25,7 +27,9 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    val viewModel: SplitViewModel = viewModel()
+                    val viewModel: SplitViewModel = viewModel(
+                        factory = SplitViewModel.provideFactory(repository)
+                    )
                     
                     NavGraph(
                         navController = navController,

@@ -1,81 +1,89 @@
 package com.example.mobiletwo.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.mobiletwo.data.Calculation
+import com.example.mobiletwo.data.CalculationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.update
 import java.util.UUID
 
-class SplitViewModel : ViewModel() {
-    private val _calculations = MutableStateFlow<List<Calculation>>(emptyList())
-    val calculations: StateFlow<List<Calculation>> = _calculations.asStateFlow()
-    
-    private val _currentTotal = MutableStateFlow<String>("")
-    val currentTotal: StateFlow<String> = _currentTotal.asStateFlow()
-    
-    private val _currentPeople = MutableStateFlow<String>("")
-    val currentPeople: StateFlow<String> = _currentPeople.asStateFlow()
-    
-    private val _currentTipPercent = MutableStateFlow<Double>(15.0)
-    val currentTipPercent: StateFlow<Double> = _currentTipPercent.asStateFlow()
-    
-    val isInputValid: StateFlow<Boolean> = combine(
-        _currentTotal,
-        _currentPeople
-    ) { total, people ->
-        val totalValue = total.toDoubleOrNull() ?: return@combine false
-        val peopleValue = people.toIntOrNull() ?: return@combine false
-        totalValue > 0 && peopleValue > 0
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-    
-    fun updateTotal(total: String) {
-        _currentTotal.value = total
+class SplitViewModel(
+    private val repository: CalculationRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(SplitUiState())
+    val uiState: StateFlow<SplitUiState> = _uiState.asStateFlow()
+
+    init {
+        loadHistory()
     }
-    
-    fun updatePeople(people: String) {
-        _currentPeople.value = people
+
+    private fun loadHistory() {
+        val history = repository.getHistory()
+        _uiState.update { it.copy(calculations = history) }
     }
-    
-    fun updateTipPercent(tipPercent: Double) {
-        _currentTipPercent.value = tipPercent
+
+    fun onEvent(event: SplitEvent) {
+        when (event) {
+            is SplitEvent.UpdateTotal -> _uiState.update { it.copy(total = event.total) }
+            is SplitEvent.UpdatePersons -> _uiState.update { it.copy(persons = event.persons) }
+            is SplitEvent.UpdateTipPercent -> _uiState.update { it.copy(tipPercent = event.tipPercent) }
+            SplitEvent.Calculate -> calculate()
+            SplitEvent.Reset -> reset()
+        }
     }
-    
-    fun calculate(): String {
-        val total = _currentTotal.value.toDoubleOrNull() ?: return ""
-        val people = _currentPeople.value.toIntOrNull() ?: return ""
-        val tipPercent = _currentTipPercent.value
-        
-        if (total <= 0 || people <= 0) return ""
-        
+
+    private fun calculate() {
+        val total = _uiState.value.total.toDoubleOrNull() ?: return
+        val people = _uiState.value.persons.toIntOrNull() ?: return
+        val tipPercent = _uiState.value.tipPercent.toDoubleOrNull() ?: 15.0
+
+        if (total <= 0 || people <= 0) return
+
         val calculation = Calculation(
             id = UUID.randomUUID().toString(),
             total = total,
             people = people,
             tipPercent = tipPercent
         )
-        
-        val updatedList = (_calculations.value + calculation).takeLast(5)
-        _calculations.value = updatedList
-        
-        return calculation.id
+
+        val newHistory = (_uiState.value.calculations + calculation).takeLast(5)
+        repository.saveHistory(newHistory)
+
+        _uiState.update {
+            it.copy(
+                calculations = newHistory,
+                calculationIdForNavigation = calculation.id
+            )
+        }
     }
-    
+
     fun getCalculationById(id: String): Calculation? {
-        return _calculations.value.find { it.id == id }
+        return _uiState.value.calculations.find { it.id == id }
     }
-    
-    fun reset() {
-        _currentTotal.value = ""
-        _currentPeople.value = ""
-        _currentTipPercent.value = 15.0
+
+    private fun reset() {
+        _uiState.update { 
+            SplitUiState(calculations = it.calculations)
+        }
+    }
+
+    fun onNavigationDone() {
+        _uiState.update { it.copy(calculationIdForNavigation = null) }
+    }
+
+    companion object {
+        fun provideFactory(
+            repository: CalculationRepository
+        ): ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                SplitViewModel(repository)
+            }
+        }
     }
 }
